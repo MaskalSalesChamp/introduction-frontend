@@ -167,7 +167,7 @@ const MyView = View.extend({
     var collection = new AdressCollection()
     collection.fetch({
       success: response => {
-        var streetCollection = new Backbone.Collection(
+        var streetCollection = new Backbone.Collection( 
           _.values(
             _.mapObject(
               collection.groupBy(adress => {
