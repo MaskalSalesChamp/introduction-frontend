@@ -9,6 +9,8 @@ import searchTemp from './templates/searchView.hbs'
 import appLayoutTemp from './templates/appLayoutView.hbs'
 import listItemTemp from './templates/ListItemView.hbs'
 import adressTemplate from './templates/adressTemplate.hbs'
+import formTemp from './templates/formTemplate.hbs';
+//import { AdressModel } from './model/adressModel.js';
 
 import '@fortawesome/fontawesome-free/js/all.js'
 
@@ -20,7 +22,6 @@ var AdressCollection = Backbone.Collection.extend({
   parse: function (data) {
     return data.data
   },
-
   initialize: function () {
     this.bind('reset', function () {
       console.log('Inside event')
@@ -28,24 +29,32 @@ var AdressCollection = Backbone.Collection.extend({
     })
   }
 })
-/*var dataCollectionInstance = new dataCollection()
-  dataCollectionInstance.fetch({
-    success: function (response) {
-      console.log('Inside success')
-      console.log(response)
-    },
-    error: function (errorResponse) {
-      console.log(errorResponse)
-    }
-  })*/
-//var App = new Backbone.Marionette.Application();
+
+var State = Backbone.Model.extend({
+  defaults: {
+    selectedAdress: null
+  },
+});
+var FormView = View.extend({
+  template: formTemp,
+  regions: {
+  }
+})
+
 var HeaderView = View.extend({
   template: headerTemp,
-  regions: {
-    headerRegion: '#header-region'
+  initialize (model) {
+    this.labelAdress = this.model.get('selectedAdress') || 'Neznama ulica';
+    this.listenTo(this.model, 'change:selectedAdress', this.onStreetChange);
+    //this.model.on('change:street',this.reRender);  
+    //console.log(this.model);
+
   },
-  initialize (options) {
-    this.labelAdress = options.labelAdress || 'Neznama ulica';
+  onStreetChange() {
+    /*console.log('CHANGEEEEEE!!');
+    console.log(this.model.get('selectedAdress').attributes.street);*/
+    this.labelAdress = this.model.get('selectedAdress').attributes.street;
+    this.render();
   },
   templateContext () {
     return {
@@ -55,9 +64,36 @@ var HeaderView = View.extend({
 })
 var ButtonsView = View.extend({
   template: buttonsTemp,
-  regions: {
-    buttonRegion: '#button-region'
-  }
+  triggers: {
+    'click @ui.nt': 'onNTClick',
+    'click @ui.ovk': 'onOVKClick'
+  },
+  ui: {
+    nt: '#NT',
+    ovk: '#OVK'
+  },
+  initialize () {
+    this.listenTo(this.model, 'change:selectedAdress', this.onStreetChange);
+  },
+  onStreetChange(){
+  },
+  /*onNTClick() {
+    var attributes = Backbone.Model.extend({});
+    attributes = this.model.get('selectedAdress').attributes;
+    //var status = this.model.get('selectedAdress');
+    console.log(attributes);
+    this.attributes.set('status','NT');
+    console.log(this.model.get('selectedAdress').attributes);
+    //console.log(this.model.get('selectedAdress').attributes.id);
+    //console.log("https://introduction-api.do.saleschamp.io/introduction-api/items/address/"+ this.model.get('selectedAdress').attributes.id);
+
+    console.log(this.model.url + this.model.get('selectedAdress').attributes.id);
+    this.model.save('selectedAdress.attributes.status', 'NT', {url:"https://introduction-api.do.saleschamp.io/introduction-api/items/address/"+ this.model.get('selectedAdress').attributes.id});
+    console.log(this.model.get('selectedAdress'));
+  },
+  onOVKClick() {
+    console.log(this.getUI('ovk'));
+  }*/
 })
 var SearchView = View.extend({
   template: searchTemp,
@@ -66,44 +102,39 @@ var SearchView = View.extend({
   }
 })
 
+
 var ListView = CollectionView.extend({
+  initialize () {
+    //console.log(this.options.model);
+  },
+  tagName: 'ul',
+  className: 'list-group',
   childViewOptions (model) {
     //console.log(model);
     //console.log(model.get('adresses'))
-    return { collection: model.get('adresses') }
+    return { collection: model.get('adresses'),state: this.options.model}
   },
-  /*adressSelected: function(childView){
-    console.log('adress selected: ' + childView.model.cid);
-    this.triggerMethod('selected:adress', this, childView);
-  },*/
 
   childView: CollectionView.extend({
+    tagName:'li',
+      className: 'list-group-item',
     childViewEvents: {
       'select:item': 'itemSelected'
-    },    
-  
-    addClass() {
     },
     itemSelected (view) {
-      console.log(this.$el);
-      this.$el.addClass('active');
+      var stateModel = this.options.state;
+      this.$el.toggleClass('active');
       this.toggleElement = this.$el[0];
-      //console.log(this.toggleElement);
-      //var selectedAdress = _.values(this.collection.models);
-      var selectedAdress = this.collection.toJSON()
-      console.log(selectedAdress[0].city)
-      var newHeaderView = new HeaderView({
-        labelAdress: selectedAdress[0].city
-      });
-      console.log(newHeaderView);
-      newHeaderView.render();
+
+      stateModel.set('selectedAdress', view.model);
+      console.log(stateModel.get('selectedAdress').attributes.street);
 
     },
     childView: View.extend({
-      classname: 'active',
+      tagName:'span',
       initialize () {},
       triggers: {
-        'click li': 'select:item'
+        'click span': 'select:item'
       },
       template: adressTemplate,
     })
@@ -112,12 +143,25 @@ var ListView = CollectionView.extend({
 
 const MyView = View.extend({
   template: appLayoutTemp,
+
   regions: {
     mainRegion: '#main-region',
     header: '#header-region',
     buttons: '#buttons-region',
     search: '#search-region',
-    list: '#list-region'
+    list: '#list-region' 
+  },
+  childViewEvents: {
+    'onNTClick': 'NTClicked',
+    'onOVKClick': 'OVKClicked'
+  },
+
+  NTClicked() {
+    this.model.save('selectedAdress.attributes.status', 'NT', {url:"https://introduction-api.do.saleschamp.io/introduction-api/items/address/"+ this.model.get('selectedAdress').attributes.id, patch: true});
+    console.log(this.model.get('selectedAdress'));
+  },
+  OVKClicked() {
+    this.showChildView('mainRegion', new FormView());
   },
   onRender () {
     var collection = new AdressCollection()
@@ -134,7 +178,6 @@ const MyView = View.extend({
                   street: key,
                   adresses: new Backbone.Collection(
                     value.map(model => {
-                      //console.log(model.attributes);
                       return model.attributes
                     })
                   )
@@ -145,33 +188,44 @@ const MyView = View.extend({
         )
         this.showChildView(
           'list',
-          new ListView({ collection: streetCollection })
+          new ListView({ collection: streetCollection, model:this.model})
         )
-        this.showChildView(
-          'header',
-          new HeaderView({})
-          
-        )
-        console.log(new HeaderView({}));
-
-        //console.log(streetCollection)
-        //console.log(response);
       }
     }),
-      this.showChildView('buttons', new ButtonsView())
+    this.showChildView(
+      'header',
+      new HeaderView({model:this.model})
+    ),
+    this.showChildView('buttons', new ButtonsView({model:this.model}))
     this.showChildView('search', new SearchView())
+    this.listenTo(this.model, 'change',() => console.log('change made' + this.model))
+
+
   },
-  childItemSelected: function () {
-    console.log('daco')
-  }
+
 })
 const App = Application.extend({
   region: '#app-container',
+  onBeforeStart(app, options) {
+    this.model = new State(options.data);
+  },
 
   onStart (app) {
-    this.showView(new MyView({}))
+    this.showView(new MyView({
+      model: this.model
+    }))
+    //console.log(this.model.attributes.selectedAdress);
   }
 })
 const app = new App()
 
-app.start({})
+app.start({
+  data: {
+    id: 0,
+    city: 'unknown - city',
+    status: 'unknown - status',
+    street: 'unknown - street',
+    postalCode: 'unknown - postalCode',
+    isSelected: false
+  }
+})
