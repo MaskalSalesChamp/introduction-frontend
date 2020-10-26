@@ -30,10 +30,6 @@ var AdressCollection = Backbone.Collection.extend({
   }
 })
 
-/*var AdressModel = Backbone.Model.extend({
-  url:'https://introduction-api.do.saleschamp.io/introduction-api/items/address/1', 
-}); */
-
 var State = Backbone.Model.extend({
   url:
     'https://introduction-api.do.saleschamp.io/introduction-api/items/address',
@@ -45,15 +41,12 @@ var State = Backbone.Model.extend({
 var HeaderView = View.extend({
   template: headerTemp,
   initialize (model) {
-    this.labelAdress = this.model.get('selectedAdress') || 'Neznama ulica'
+    var adressModel = this.options.adressModel;
+    console.log(adressModel);
+    this.labelAdress = this.model.get('selectedAdress') || adressModel.get('street');
     this.listenTo(this.model, 'change:selectedAdress', this.onStreetChange)
-
-    //this.model.on('change:street',this.reRender);
-    console.log(model)
   },
   onStreetChange () {
-    /*console.log('CHANGEEEEEE!!');
-    console.log(this.model.get('selectedAdress').attributes.street);*/
     this.labelAdress = this.model.get('selectedAdress').attributes.street
     this.render()
   },
@@ -67,11 +60,44 @@ var FormView = View.extend({
   template: formTemp,
   ui: {
     cancel: '#cancel',
-    save: '#save'
+    save: '#save',
+    name: '#InputName',
+    email: '#InputEmail',
+    form: '#form'
+  },
+  preventDefault: true,
+  events: {
+    'click @ui.cancel': 'cancelling',
+    'click @ui.save': 'saving'
   },
   triggers: {
     'click @ui.cancel': 'onCancelClick',
-    'click @ui.save': 'onSaveClick'
+    'click @ui.save': 'onSaveClick',
+    'submit @ui.form': 'onSubmitClick'
+  },
+  cancelling(){
+  },
+
+  saving(){
+    console.log(this.model)
+    var name = this.ui.name.val();
+    var email = this.ui.email.val();
+    var activeId = this.model.get('selectedAdress').id
+    //console.log('https://introduction-api.do.saleschamp.io/introduction-api/items/address/' + activeId);
+
+    this.model.get('selectedAdress').save(
+      { status: 'OVK', name: name, email: email },
+      {
+        url:
+          'https://introduction-api.do.saleschamp.io/introduction-api/items/address/' +
+          activeId,
+        patch: true,
+        success () {
+          console.log('saved OVK')
+        }
+      }
+    )
+    this.model.set('selectedAdress');
   }
 })
 
@@ -93,35 +119,27 @@ var ButtonsView = View.extend({
     this.listenTo(this.model, 'change:selectedAdress', this.onStreetChange)
   },
   onStreetChange () {}
-  /*onNTClick() { 
-    var attributes = Backbone.Model.extend({});
-    attributes = this.model.get('selectedAdress').attributes;
-    //var status = this.model.get('selectedAdress');
-    console.log(attributes);
-    this.attributes.set('status','NT');
-    console.log(this.model.get('selectedAdress').attributes);
-    //console.log(this.model.get('selectedAdress').attributes.id);
-    //console.log("https://introduction-api.do.saleschamp.io/introduction-api/items/address/"+ this.model.get('selectedAdress').attributes.id);
-
-    console.log(this.model.url + this.model.get('selectedAdress').attributes.id);
-    this.model.save('selectedAdress.attributes.status', 'NT', {url:"https://introduction-api.do.saleschamp.io/introduction-api/items/address/"+ this.model.get('selectedAdress').attributes.id});
-    console.log(this.model.get('selectedAdress'));
-  },
-  onOVKClick() {
-    console.log(this.getUI('ovk'));
-  }*/
 })
 var SearchView = View.extend({
   template: searchTemp,
   regions: {
     searchRegion: '#search-region'
+  },
+  triggers: {
+    'keyup #searchField': 'onSearchKeyUp'
   }
 })
 
 var ListView = CollectionView.extend({
-  initialize () {},
+  regions: {
+    searchRegion: '#search-region',
+  },
+
+
+  initialize () {
+  },
   tagName: 'ul',
-  className: 'list-group',
+  className: 'list-group listSearch',
   childViewOptions (model) {
     //console.log(model);
     //console.log(model.get('adresses'))
@@ -129,27 +147,35 @@ var ListView = CollectionView.extend({
   },
 
   childView: CollectionView.extend({
+    initialize() {
+      //console.log(this.options.model.get('street'));
+      //console.log(this.options.collection.model.street);
+    },
     tagName: 'li',
     className: 'list-group-item',
     childViewEvents: {
       'select:item': 'itemSelected'
     },
+    events: {
+      'click li' : 'onSelect'
+    },
     itemSelected (view) {
       var stateModel = this.options.state
-      this.$el.toggleClass('active')
+      this.$el.addClass('active');
+      this.$el.siblings().removeClass('active');
       this.toggleElement = this.$el[0]
 
       stateModel.set('selectedAdress', view.model)
       //console.log(stateModel.get('selectedAdress').attributes.street);
       stateModel.set('collection', this.model.collection)
-      console.log(stateModel)
+      //console.log(stateModel)
     },
     childView: View.extend({
-      tagName: 'span',
       template: adressTemplate,
       initialize () {
         //console.log(this.model.attributes.number);
         //console.log(this.collection);
+        //console.log(this.options.model.id)
       },
       triggers: {
         'click span': 'select:item'
@@ -158,7 +184,7 @@ var ListView = CollectionView.extend({
         'click span': 'onSelect'
       },
       onSelect () {
-        $('.numberList').toggleClass('d-none')
+        this.$el.find('span').children().toggleClass('d-none');
       }
     })
   })
@@ -174,34 +200,44 @@ const MyView = View.extend({
     search: '#search-region',
     list: '#list-region'
   },
+  
   childViewEvents: {
     onNTClick: 'NTClicked',
     onOVKClick: 'OVKClicked',
-    onSaveClick: 'onSave',
-    onCancelClick: 'onCancel'
+    onSaveClick: 'onSaved',
+    onCancelClick: 'onCancel',
+    onSubmitClick: 'onSubmit',
+    onSearchKeyUp: 'onSearch'
+  },
+
+  onSearch(){
+    console.log(this.$el.find('.listSearch'));
+  },
+
+  onSubmit() {
+    console.log('submit??')
+    console.log(this.model);
+    //this.showChildView('search', new SearchView());
+    this.render();
+    this.onRender();
+    var coll = new AdressCollection();
+    coll.fetch({
+      success: res => {
+        console.log(res);
+      }
+    })
 
   },
-  onSave () {
-    console.log('SAVE??')
-  },
   onCancel() {
-    console.log('CANCEL??')
+    console.log('CANCEL??');
+    //this.showChildView('search', new SearchView());
+    this.$el.find('#search-region').removeClass('d-none');
+    this.onRender();
+
   },
   NTClicked () {
-    //console.log(this.model.get('selectedAdress').collection);
-    /* this.model.save({status: 'NT'}, {patch:true, success(){
-      console.log('saved bitch');
-    }})
-    var activeAdressStatus = this.model.get('selectedAdress').attributes.status;
-    //console.log(activeAdress);
-    this.model.sync(activeAdressStatus,'NT',{patch:true, success(){
-      console.log('saved bitch');
-    }});
-    var adressModel = new AdressModel();
-    adressModel = this.model.get('selectedAdress');
-    console.log(adressModel);*/
     var activeId = this.model.get('selectedAdress').id
-    console.log(activeId)
+    //console.log(activeId)
     //console.log('https://introduction-api.do.saleschamp.io/introduction-api/items/address/' + activeId);
 
     this.model.get('selectedAdress').save(
@@ -212,23 +248,26 @@ const MyView = View.extend({
           activeId,
         patch: true,
         success () {
-          console.log('saved dopi')
+          console.log('saved')
         }
-      }
+      },
+      this.onRender()
     )
-    /*adressModel.save({status: 'NT'}, {patch:true, success(){
-      console.log('saved bitch');
-    }})*/
   },
   OVKClicked () {
-    this.showChildView('mainRegion', new FormView({ model: this.model }))
+    this.showChildView('list', new FormView({ model: this.model }))
+    this.$el.find('#search-region').addClass('d-none');
+    
+    
+
   },
   onRender () {
-    console.log(this.collection)
+    console.log('rendering')
     var collection = new AdressCollection({})
-    console.log(collection.url)
     collection.fetch({
+      
       success: response => {
+        console.log('fetched')
         var streetCollection = new Backbone.Collection(
           _.values(
             _.mapObject(
@@ -247,21 +286,28 @@ const MyView = View.extend({
               }
             )
           )
+          
         )
-        console.log(streetCollection)
         this.showChildView(
           'list',
           new ListView({ collection: streetCollection, model: this.model })
         ),
-          this.showChildView('buttons', new ButtonsView({ model: this.model }))
+          this.showChildView('buttons', new ButtonsView({ model: this.model })),
+          this.showChildView('header', new HeaderView({ model: this.model, adressModel: streetCollection.at(0)}))
+          console.log(streetCollection)
+          console.log('rendering done')
+
       }
     }),
-      this.showChildView('header', new HeaderView({ model: this.model })),
+      //this.showChildView('header', new HeaderView({ model: this.model })),
       //this.showChildView('buttons', new ButtonsView({model:this.model}))
       this.showChildView('search', new SearchView())
-    this.listenTo(this.model, 'change', () =>
+    this.listenTo(this.model, 'change', () => {
       console.log('change made' + this.model)
+
+    }
     )
+
   }
 })
 const App = Application.extend({
@@ -276,7 +322,7 @@ const App = Application.extend({
         model: this.model
       })
     )
-    //console.log(this.model)
+    console.log(this.model)
     //console.log(this.model.attributes.selectedAdress);
   }
 })
@@ -284,11 +330,11 @@ const app = new App()
 
 app.start({
   data: {
-    id: 0,
+    /*id: 0,
     city: 'unknown - city',
     status: 'unknown - status',
     street: 'unknown - street',
     postalCode: 'unknown - postalCode',
-    isSelected: false
+    isSelected: false*/
   }
 })
